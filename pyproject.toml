@@ -1,6 +1,6 @@
 [project]
-name = "spaceweather"
-version = "1.0.0"
+name = "sunweather"
+version = "1.0.1"
 description = ""
 authors = [
     {name = "DJ Stomp",email = "85457381+DJStompZone@users.noreply.github.com"}

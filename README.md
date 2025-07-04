@@ -1,4 +1,4 @@
-# spaceweather
+# sunweather
 
 **Generate a 6-band grid animation of solar activity from NOAA SUVI data.**  
 This CLI tool fetches the latest extreme ultraviolet (EUV) imagery from NOAA SWPC’s SUVI archive and creates an animated AVI or GIF showing the solar corona across 6 wavelengths.
@@ -8,7 +8,7 @@ This CLI tool fetches the latest extreme ultraviolet (EUV) imagery from NOAA SWP
 ## Installation
 
 ```bash
-pip install spaceweather
+pip install sunweather
 ```
 
 > Requires: Python 3.8+, `ffmpeg` in PATH
@@ -18,13 +18,13 @@ pip install spaceweather
 ## Usage
 
 ```bash
-spaceweather [options]
+sunweather [options]
 ```
 
 ### Basic Example
 
 ```bash
-spaceweather -o sun.avi
+sunweather -o sun.avi
 ```
 
 Creates a 6-band grid animation as an AVI (`sun.avi`) using the most recent frames available.
@@ -91,4 +91,4 @@ MIT © [DJ Stomp](https://github.com/DJStompZone)
 
 ## Source & Issues
 
-GitHub: [https://github.com/DJStompZone/spaceweather](https://github.com/DJStompZone/spaceweather)
+GitHub: [https://github.com/DJStompZone/sunweather](https://github.com/DJStompZone/sunweather)
