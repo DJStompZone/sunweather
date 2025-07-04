@@ -18,17 +18,30 @@ pip install sunweather
 ## Usage
 
 ```bash
-sunweather [options]
+python -m sunweather [options]
 ```
 
-### Basic Example
+### Basic Examples
+
+#### Simple invocation
+
+By default, `sunweather` creates a 6-band grid animation as an MP4 using the most recent frames available from NOAA. Uses a fast AVI intermediate to ensure compatibility and re-encodes with `libx264` for better visual quality.
 
 ```bash
-sunweather -o sun.mp4
+python -m sunweather
 ```
 
-Creates a 6-band grid animation as an MP4 (`sun.mp4`) using the most recent frames available.  
-Uses a fast AVI intermediate and re-encodes with `libx264` for high visual quality.
+#### Specifying an output filename
+
+```bash
+python -m sunweather -o sun.mp4
+```
+
+#### Custom framerate
+
+```bash
+python -m sunweather --fps 12
+```
 
 ---
 
