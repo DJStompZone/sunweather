@@ -90,7 +90,7 @@ choco install ffmpeg
 
 ## Example Output
 
-![Example Video](https://i.imgur.com/3Vt35bU.mp4)
+![Example Video](https://i.imgur.com/3Vt35bU.gif)
 
 ---
 
