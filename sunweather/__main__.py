@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
-6-band SUVI grid → tiny AVI
+6-band SUVI grid → high-quality MP4 (AVI intermediate)
 
-• Scrapes 094,131,171,195,284,304 angstrom wavelengths
-• Builds a 2×3 grid per timestamp
-• Encodes to Xvid-AVI by default
-• Pass a .gif filename if you really want an animated GIF instead
+▪ Scrapes 094,131,171,195,284,304 angstrom images
+▪ Builds a 2 × 3 grid per timestamp/frame
 """
 
 from __future__ import annotations
@@ -20,52 +18,41 @@ from tqdm.asyncio import tqdm_asyncio
 from tqdm import tqdm
 
 # ─── constants ──────────────────────────────────────────────────────────────
-BANDS: Final[List[str]] = ["094", "131", "171", "195", "284", "304"]
-GRID_ORDER: Final[List[str]] = BANDS[:]
-BASE_URL: Final[str] = "https://services.swpc.noaa.gov/images/animations/suvi/primary/"
-HREF_RE: Final[re.Pattern[str]] = re.compile(r'href="(or_suvi-[^"]+\.png)"')
-HEADERS = {
-    "referer": "https://www.swpc.noaa.gov/",
+BANDS:      Final[List[str]]  = ["094", "131", "171", "195", "284", "304"]
+GRID_ORDER: Final[List[str]]  = BANDS[:]
+BASE_URL:   Final[str]        = "https://services.swpc.noaa.gov/images/animations/suvi/primary/"
+HREF_RE:    Final[re.Pattern] = re.compile(r'href="(or_suvi-[^"]+\.png)"')
+HEADERS                     = {
+    "referer":    "https://www.swpc.noaa.gov/",
     "user-agent": "Mozilla/5.0 (+SUVI-grid-AVI)",
 }
-# ---------------------------------------------------------------------------
+FFMPEG_OPTS = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
 
-
+# ─── helpers: scraping & downloading ────────────────────────────────────────
 def scrape_band(band: str) -> List[str]:
-    """Fetch and return sorted PNG URLs for a wavelength band."""
+    """Return sorted PNG URLs for a wavelength band."""
     url = f"{BASE_URL}{band}/"
-    r = httpx.get(url, headers=HEADERS, timeout=30, follow_redirects=True)
-    r.raise_for_status()
-    rels = [m for m in HREF_RE.findall(r.text) if m.startswith("or_suvi")]
-    rels.sort()  # ISO timestamp → lexicographic
+    text = httpx.get(url, headers=HEADERS, timeout=30).text
+    rels = [m for m in HREF_RE.findall(text) if m.startswith("or_suvi")]
+    rels.sort()                                      # ISO timestamp = lexical
     return [urljoin(url, rel) for rel in rels]
 
-
-# ─── async downloader with retry/back-off ───────────────────────────────────
 async def _grab(client, url: str, dest: pathlib.Path, tries: int, strict: bool):
-    delay = 1.0
+    delay = 2.0
     for attempt in range(1, tries + 1):
         try:
-            r = await client.get(url, timeout=30)
+            r = await client.get(url, timeout=30+delay)
             r.raise_for_status()
             dest.write_bytes(r.content)
-            logging.debug("✓ %s (try %d)", dest.name, attempt)
             return
         except (httpx.HTTPStatusError, httpx.ProtocolError):
             if attempt == tries:
-                msg = f"give-up {dest.name} after {tries} tries"
                 if strict:
-                    raise RuntimeError(msg)
-                logging.info(msg)
+                    raise RuntimeError(f"Give-up {dest.name} after {tries} tries")
+                logging.warning("Skipping %s", dest.name)
                 return
             await asyncio.sleep(delay)
             delay *= 2
-        except Exception:
-            if strict:
-                raise
-            logging.exception("skip %s (unexpected)", dest.name)
-            return
-
 
 async def download_all(
     url_matrix: Dict[str, List[str]],
@@ -85,19 +72,17 @@ async def download_all(
         await tqdm_asyncio.gather(*tasks, desc="Downloading", unit="img")
     return meta
 
-
-# ─── helpers: gap-fill & composition ────────────────────────────────────────
+# ─── helpers: gap-fill & grid composition ───────────────────────────────────
 def nearest_tile(idx: int, band: str, table):
-    for j in range(idx, -1, -1):          # backward
+    for j in range(idx, -1, -1):
         p = table.get(j, {}).get(band)
         if p and p.exists():
             return p
-    for j in range(idx + 1, max(table) + 1):  # forward
+    for j in range(idx + 1, max(table) + 1):
         p = table.get(j, {}).get(band)
         if p and p.exists():
             return p
     return None
-
 
 def compose_grid(row: Dict[str, pathlib.Path]) -> Image.Image:
     imgs = [Image.open(row[b]).convert("RGB") for b in GRID_ORDER]
@@ -108,34 +93,41 @@ def compose_grid(row: Dict[str, pathlib.Path]) -> Image.Image:
         canvas.paste(img, (c * w, r * h))
     return canvas
 
-
-# ─── encoding ───────────────────────────────────────────────────────────────
-def encode_avi(
-    frames: List[Image.Image],
-    outfile: pathlib.Path,
-    fps: int,
-    max_w: int = 1280,
-):
+# ─── encoding helpers ───────────────────────────────────────────────────────
+def encode_avi(frames: List[Image.Image], outfile: pathlib.Path, fps: int, verbose: bool = False):
+    """Encode PNG frames → Xvid-AVI (fast)."""
     tmp = pathlib.Path(tempfile.mkdtemp())
     try:
-        for i, img in enumerate(tqdm(frames, desc="Writing PNG seq", unit="img")):
-            if img.width > max_w:
-                h_new = int(img.height * max_w / img.width)
-                img = img.resize((max_w, h_new), Image.LANCZOS)
+        for i, img in enumerate(tqdm(frames, desc="PNG→seq", unit="img")):
             img.save(tmp / f"f{i:05d}.png")
-        cmd = [
-            "ffmpeg", "-y",
-            "-framerate", str(fps),
-            "-i", str(tmp / "f%05d.png"),
-            "-c:v", "mpeg4",
-            "-vtag", "xvid",
-            "-q:v", "5",
-            str(outfile)
+        
+        ffmpeg_command = [
+                *FFMPEG_OPTS[slice(verbose and 2 or None)],
+                "-framerate", str(fps),
+                "-i", str(tmp / "f%05d.png"),
+                "-c:v", "mpeg4",
+                "-vtag", "xvid",
+                "-q:v",  "2",
+                str(outfile),
         ]
-        subprocess.run(cmd, check=True)
+        logging.debug(f"{ffmpeg_command=}")
+        subprocess.run(ffmpeg_command, check=True)
     finally:
         shutil.rmtree(tmp)
 
+def encode_mp4_from_avi(avi_file: pathlib.Path, mp4_file: pathlib.Path, verbose: bool = False):
+    """Re-encode AVI → MP4 (libx264 CRF-18 slow)."""
+    ffmpeg_command = [
+            *FFMPEG_OPTS[slice(verbose and 2 or None)],
+            "-i", str(avi_file),
+            "-vf", "scale=1920:-2",
+            "-c:v", "libx264",
+            "-crf",  "18",
+            "-preset", "slow",
+            str(mp4_file),
+    ]
+    logging.debug(f"{ffmpeg_command=}")
+    subprocess.run(ffmpeg_command, check=True)
 
 def build_gif(frames, outfile: pathlib.Path, fps: int):
     frames[0].save(
@@ -148,17 +140,18 @@ def build_gif(frames, outfile: pathlib.Path, fps: int):
         disposal=2,
     )
 
-
 # ─── main ───────────────────────────────────────────────────────────────────
 def main():
-    p = argparse.ArgumentParser("SUVI grid → tiny AVI / optional GIF")
-    p.add_argument("-o", "--output", type=pathlib.Path, default="suvi_grid.avi")
-    p.add_argument("--fps", type=int, default=15)
-    p.add_argument("--frames", type=int, default=None)
-    p.add_argument("--retries", type=int, default=3)
-    p.add_argument("--keep", action="store_true")
-    p.add_argument("--strict", action="store_true")
-    p.add_argument("--debug", action="store_true")
+    p = argparse.ArgumentParser("SUVI grid → MP4 (AVI intermediate) / GIF")
+    p.add_argument("-o", "--output", type=pathlib.Path,
+                   default=pathlib.Path("suvi_grid.mp4"))
+    p.add_argument("--fps",      type=int, default=20)
+    p.add_argument("--frames",   type=int)
+    p.add_argument("--retries",  type=int, default=3)
+    p.add_argument("--keep",     action="store_true", help="keep PNG frames dir")
+    p.add_argument("--keep-avi", action="store_true", help="keep intermediate AVI")
+    p.add_argument("--strict",   action="store_true")
+    p.add_argument("--debug",    action="store_true")
     args = p.parse_args()
 
     logging.basicConfig(
@@ -168,41 +161,50 @@ def main():
 
     # 1. scrape listings
     per_band = {b: scrape_band(b) for b in BANDS}
-    min_len = min(len(lst) for lst in per_band.values())
-    use_len = min(args.frames or min_len, min_len)
-    logging.info("Using last %d frames (min available %d)", use_len, min_len)
+    min_len  = min(map(len, per_band.values()))
+    use_len  = min(args.frames or min_len, min_len)
+    logging.info("Using last %d frames (min=%d)", use_len, min_len)
 
-    # 2. build URL matrix
+    # 2. URLs to grab
     urls = {b: lst[-use_len:] for b, lst in per_band.items()}
 
-    # 3. download
+    # 3. download PNGs
     workdir = pathlib.Path("frames") if args.keep else pathlib.Path(tempfile.mkdtemp())
-    meta = asyncio.run(download_all(urls, workdir, args.retries, args.strict))
+    meta    = asyncio.run(download_all(urls, workdir, args.retries, args.strict))
 
-    # 4. gap-fill & compose
+    # 4. compose grids
     grids: List[Image.Image] = []
     for i in tqdm(range(use_len), desc="Composing", unit="frame"):
         for band in GRID_ORDER:
-            if not (p := meta[i].get(band)) or not p.exists():
-                repl = nearest_tile(i, band, meta)
-                if not repl:
+            pth = meta[i].get(band)
+            if not pth or not pth.exists():
+                pth = nearest_tile(i, band, meta)
+                if not pth:
                     if args.strict:
                         raise RuntimeError(f"Missing {band}_{i}")
                     break
-                meta[i][band] = repl
+                meta[i][band] = pth
         else:
             grids.append(compose_grid(meta[i]))
 
     if len(grids) < 2:
         raise SystemExit("Not enough frames to encode.")
 
-    # 5. encode
-    if args.output.suffix.lower() == ".gif":
+    # 5. encode path logic
+    suffix = args.output.suffix.lower()
+    if suffix == ".gif":
         build_gif(grids, args.output, args.fps)
-    else:
-        encode_avi(grids, args.output, args.fps)
-    logging.info("Saved → %s", args.output.resolve())
+    elif suffix == ".mp4":
+        avi_tmp = args.output.with_suffix(".avi")
+        encode_avi(grids, avi_tmp, args.fps, verbose=args.debug)
+        encode_mp4_from_avi(avi_tmp, args.output, verbose=args.debug)
+        if not args.keep_avi:
+            avi_tmp.unlink(missing_ok=True)
+    else:  # fallback: raw AVI
+        encode_avi(grids, args.output, args.fps, verbose=args.debug)
 
+    logging.debug("Saved → %s", args.output.resolve())
+    print(f"Saved → {args.output.resolve()}")
 
 if __name__ == "__main__":
     main()
