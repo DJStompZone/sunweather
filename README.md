@@ -32,18 +32,19 @@ Uses a fast AVI intermediate and re-encodes with `libx264` for high visual quali
 
 ---
 
+
 ## Options
 
-| Option               | Description                                                   |
-|----------------------|---------------------------------------------------------------|
-| `-o, --output`       | Output filename (`.mp4`, `.avi`, or `.gif`). Default: `suvi_grid.mp4` |
-| `--fps`              | Frames per second. Default: `20`                              |
-| `--frames`           | Max frames to use (per band). Defaults to what all bands share |
-| `--retries`          | Retry attempts per image. Default: `3`                        |
-| `--strict`           | Fail hard if any image is missing.     |
-| `--keep`             | Keep downloaded frames instead of using a temp folder         |
-| `--keep-avi`         | Preserve the temporary `.avi` file used before MP4 encoding.   |
-| `--debug`            | Enable verbose logging.                     |
+| Option               | Description                                                  | Default             |
+|----------------------|--------------------------------------------------------------|---------------------|
+| `-o, --output`       | Output filename (`.mp4`, `.avi`, or `.gif`)                  | `suvi_grid.mp4`     |
+| `--fps`              | Frames per second                                            | `20`                |
+| `--frames`           | Max frames to use (per band)                                 | auto-detected       |
+| `--retries`          | Retry attempts per image                                     | `3`                 |
+| `--strict`           | Fail hard if any image is missing                            | _(soft fallback)_   |
+| `--keep`             | Keep downloaded frames instead of using a temp folder        | _(disabled)_        |
+| `--keep-avi`         | Preserve the intermediate `.avi` before MP4 encoding         | _(disabled)_        |
+| `--debug`            | Enable verbose logging                                       | _(disabled)_        |
 
 ---
 
