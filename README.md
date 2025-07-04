@@ -1,7 +1,7 @@
 # sunweather
 
 **Generate a 6-band grid animation of solar activity from NOAA SUVI data.**  
-This CLI tool fetches the latest extreme ultraviolet (EUV) imagery from NOAA SWPC’s SUVI archive and creates an animated AVI or GIF showing the solar corona across 6 wavelengths.
+This CLI tool fetches the latest extreme ultraviolet (EUV) imagery from NOAA SWPC’s SUVI archive and creates an animated MP4, AVI, or GIF showing the solar corona across 6 wavelengths.
 
 ---
 
@@ -24,10 +24,11 @@ sunweather [options]
 ### Basic Example
 
 ```bash
-sunweather -o sun.avi
+sunweather -o sun.mp4
 ```
 
-Creates a 6-band grid animation as an AVI (`sun.avi`) using the most recent frames available.
+Creates a 6-band grid animation as an MP4 (`sun.mp4`) using the most recent frames available.  
+Uses a fast AVI intermediate and re-encodes with `libx264` for high visual quality.
 
 ---
 
@@ -35,13 +36,14 @@ Creates a 6-band grid animation as an AVI (`sun.avi`) using the most recent fram
 
 | Option               | Description                                                   |
 |----------------------|---------------------------------------------------------------|
-| `-o, --output`       | Output filename (`.avi` or `.gif`). Default: `suvi_grid.avi` |
-| `--fps`              | Frames per second. Default: `15`                             |
+| `-o, --output`       | Output filename (`.mp4`, `.avi`, or `.gif`). Default: `suvi_grid.mp4` |
+| `--fps`              | Frames per second. Default: `20`                              |
 | `--frames`           | Max frames to use (per band). Defaults to what all bands share |
-| `--retries`          | Retry attempts per image. Default: `3`                       |
-| `--strict`           | Fail hard if any image is missing. Default: soft fallback    |
-| `--keep`             | Keep downloaded frames instead of using a temp folder        |
-| `--debug`            | Enable verbose logging                                       |
+| `--retries`          | Retry attempts per image. Default: `3`                        |
+| `--strict`           | Fail hard if any image is missing.     |
+| `--keep`             | Keep downloaded frames instead of using a temp folder         |
+| `--keep-avi`         | Preserve the temporary `.avi` file used before MP4 encoding.   |
+| `--debug`            | Enable verbose logging.                     |
 
 ---
 
@@ -50,7 +52,9 @@ Creates a 6-band grid animation as an AVI (`sun.avi`) using the most recent fram
 - Produces a 2×3 grid of concurrent SUVI images across these bands:
   - 94 Å, 131 Å, 171 Å, 195 Å, 284 Å, 304 Å
 - All frames are temporally aligned, with automatic gap-filling for any missing wavelengths.
-- Default output is a high-efficiency Xvid AVI (under 1MB), compatible with most platforms.
+- MP4 output uses high-quality H.264 encoding via FFmpeg with `-crf 18 -preset slow`.
+- AVI output (via `-o output.avi`) uses fast Xvid encoding with wide compatibility.
+- GIF output is supported but not recommended due to large file size (>100MB).
 
 ---
 
@@ -75,6 +79,12 @@ sudo apt install ffmpeg
 pkg install ffmpeg
 ```
 
+**Windows:**
+```ps1
+winget install ffmpeg
+# OR
+choco install ffmpeg
+```
 ---
 
 ## Example Output
@@ -85,7 +95,7 @@ pkg install ffmpeg
 
 ## License
 
-MIT © [DJ Stomp](https://github.com/DJStompZone)
+MIT © 2025 [DJ Stomp](https://github.com/DJStompZone)
 
 ---
 
