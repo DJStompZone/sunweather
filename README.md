@@ -37,7 +37,7 @@ Uses a fast AVI intermediate and re-encodes with `libx264` for high visual quali
 
 | Option               | Description                                                  | Default             |
 |----------------------|--------------------------------------------------------------|---------------------|
-| `-o, --output`       | Output filename (`.mp4`, `.avi`, or `.gif`)                  | `suvi_grid.mp4`     |
+| `--output`       | Output filename (`.mp4`, `.avi`, or `.gif`) (Alias: `-o`)        | `suvi_grid.mp4`     |
 | `--fps`              | Frames per second                                            | `20`                |
 | `--frames`           | Max frames to use (per band)                                 | auto-detected       |
 | `--retries`          | Retry attempts per image                                     | `3`                 |
